@@ -1,20 +1,20 @@
 require('dotenv').config();
 const express = require('express');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
+const pino = require('pino');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-
-// Meta WhatsApp Cloud API Settings
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 let RECIPIENT_PHONE = (process.env.RECIPIENT_PHONE || '01735698076').trim().replace(/[\s\-\(\)\+]/g, '');
 if (RECIPIENT_PHONE.startsWith('01') && RECIPIENT_PHONE.length === 11) {
   RECIPIENT_PHONE = '88' + RECIPIENT_PHONE; // 01735698076 -> 8801735698076
 }
 
-// Optional Google Gemini API Key (if blank, uses free Pollinations AI)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 // ৬টি ক্যাটাগরি (MBBS সম্পূর্ণ বাদ)
@@ -29,8 +29,66 @@ const CATEGORIES = [
 
 let categoryIndex = 0;
 
+// WhatsApp Baileys State
+let sock = null;
+let currentQrDataUrl = null;
+let isConnected = false;
+let connectedUser = null;
+
 /**
- * ১. সম্পূর্ণ ফ্রি AI দিয়ে বাংলা স্টাডি মোটিভেশন জেনারেট করা
+ * Baileys WhatsApp Socket ইনিশিয়ালাইজ করা (কোনো API ছাড়াই সরাসরি WhatsApp Web QR কোড)
+ */
+async function connectToWhatsApp() {
+  const authFolder = path.join(__dirname, 'auth_info');
+  if (!fs.existsSync(authFolder)) {
+    fs.mkdirSync(authFolder, { recursive: true });
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(authFolder);
+  const { version } = await fetchLatestBaileysVersion();
+
+  sock = makeWASocket({
+    version,
+    auth: state,
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: ['Study Motivation Bot', 'Chrome', '1.0.0']
+  });
+
+  sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      currentQrDataUrl = await QRCode.toDataURL(qr);
+      console.log('⚡ নতুন QR Code তৈরি হয়েছে! ব্রাউজারে গিয়ে স্ক্যান করুন।');
+    }
+
+    if (connection === 'close') {
+      isConnected = false;
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      console.log(`⚠️ WhatsApp সংযোগ বিচ্ছিন্ন হয়েছে (Code: ${statusCode})। পুনঃসংযোগ: ${shouldReconnect}`);
+
+      if (shouldReconnect) {
+        setTimeout(connectToWhatsApp, 3000);
+      } else {
+        console.log('❌ লগআউট হয়েছে। নতুন QR কোড স্ক্যান করতে হবে।');
+        try { fs.rmSync(authFolder, { recursive: true, force: true }); } catch (e) {}
+        setTimeout(connectToWhatsApp, 3000);
+      }
+    } else if (connection === 'open') {
+      isConnected = true;
+      currentQrDataUrl = null;
+      connectedUser = sock.user?.id || 'Connected';
+      console.log('✅ WhatsApp সফলভাবে সংযুক্ত হয়েছে! ইউজার:', connectedUser);
+    }
+  });
+}
+
+/**
+ * সম্পূর্ণ ফ্রি AI দিয়ে বাংলা স্টাডি মোটিভেশন জেনারেট করা
  */
 async function generateAIMotivation(category) {
   const prompt = 
@@ -46,7 +104,6 @@ Requirements:
 3. Format nicely with emojis. DO NOT include MBBS or medical topics.
 Reply ONLY with the formatted Bengali message, no introductory English text.`;
 
-  // ক. Gemini API Key থাকলে Gemini ব্যবহার করো
   if (GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '') {
     try {
       console.log('🤖 Asking Google Gemini AI...');
@@ -63,11 +120,10 @@ Reply ONLY with the formatted Bengali message, no introductory English text.`;
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text && text.trim().length > 20) return text.trim();
     } catch (err) {
-      console.warn('⚠️ Gemini AI failed, falling back to Pollinations:', err.message);
+      console.warn('⚠️ Gemini fallback to Pollinations:', err.message);
     }
   }
 
-  // খ. বিকল্প ১০০% ফ্রি AI (Pollinations AI - কোনো কি ছাড়া সরাসরি কাজ করে)
   try {
     console.log('🤖 Asking Free Pollinations AI...');
     const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`;
@@ -78,13 +134,9 @@ Reply ONLY with the formatted Bengali message, no introductory English text.`;
     console.warn('⚠️ Pollinations AI failed:', err.message);
   }
 
-  // গ. ব্যাকআপ মোটিভেশন
-  return `📌 অধ্যবসায় ও নিয়তের বরকত\n\nপড়াশোনার প্রতিটি মুহূর্তকে আল্লাহর সন্তুষ্টির নিয়তে ব্যয় করো। অলসতাকে প্রশ্রয় দিও না; আজকের পরিশ্রমই আগামী দিনের সাফল্যের মূল ভিত্তি।\n\n💡 আজকের টিপ: আগামী ১ ঘণ্টার জন্য মোবাইল দূরে রেখে পড়তে বসো।\n💬 'সময়ের মূল্যায়ন করো, কারণ অতীত সময় কখনো ফিরে আসে না।'`;
+  return `📌 অধ্যবসায় ও নিয়তের বরকত\n\nপড়াশোনার প্রতিটি মুহূর্তকে আল্লাহর সন্তুষ্টির নিয়তে ব্যয় করো। অলসতাকে প্রশ্রয় দিও না; আজকের পরিশ্রমই আগামী দিনের বিজয়ের চাবিকাঠি।\n\n💡 আজকের টিপ: আগামী ১ ঘণ্টা ফোন দূরে রেখে মন দিয়ে পড়ো।\n💬 'সময়ের মূল্যায়ন করো, কারণ অতীত সময় কখনো ফিরে আসে না।'`;
 }
 
-/**
- * হোয়াটসঅ্যাপের জন্য সুন্দর করে মেসেজ সাজানো
- */
 function formatWhatsAppText(category, aiContent) {
   const timeStr = new Date().toLocaleTimeString('bn-BD', {
     hour: '2-digit',
@@ -105,109 +157,176 @@ function formatWhatsAppText(category, aiContent) {
 }
 
 /**
- * ২. অফিসিয়াল Meta WhatsApp Cloud API দিয়ে সরাসরি হোয়াটসঅ্যাপে পাঠানো
+ * Baileys দিয়ে সরাসরি WhatsApp এ পাঠানো (No API!)
  */
-async function sendToMetaWhatsApp(messageText) {
-  if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
-    throw new Error('WHATSAPP_TOKEN or PHONE_NUMBER_ID is missing in Render environment variables.');
+async function sendViaBaileys(messageText) {
+  if (!sock || !isConnected) {
+    throw new Error('WhatsApp is not connected yet! Please scan the QR code on the website homepage.');
   }
 
-  const url = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`;
-
-  const payload = {
-    messaging_product: 'whatsapp',
-    to: RECIPIENT_PHONE,
-    type: 'text',
-    text: { body: messageText }
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const result = await response.json();
-  if (!response.ok) {
-    throw new Error(result.error?.message || JSON.stringify(result));
-  }
-
+  // Target JID: e.g. 8801735698076@s.whatsapp.net
+  const jid = `${RECIPIENT_PHONE}@s.whatsapp.net`;
+  const result = await sock.sendMessage(jid, { text: messageText });
   return result;
 }
 
-// ১. ওয়েকআপ এন্ডপয়েন্ট (GitHub Actions প্রতি ৫ মিনিটে কল করে Render কে জাগিয়ে রাখবে)
+// 1. Keepalive Ping Endpoint (GitHub Actions প্রতি ৫ মিনিটে কল করবে)
 app.get('/ping', (req, res) => {
   res.send('Render is awake and ready! 🚀');
 });
 
-// ২. মূল ট্রিগার এন্ডপয়েন্ট (GitHub Actions প্রতি ১ ঘণ্টায় কল করবে)
+// 2. Status API
+app.get('/status', (req, res) => {
+  res.json({
+    connected: isConnected,
+    recipient: RECIPIENT_PHONE,
+    hasQr: Boolean(currentQrDataUrl)
+  });
+});
+
+// 3. Hourly Motivation Trigger Endpoint
 app.all('/send', async (req, res) => {
   console.log(`\n⏰ [${new Date().toISOString()}] Hourly motivation trigger received!`);
+
+  if (!isConnected) {
+    return res.status(400).json({
+      success: false,
+      error: 'WhatsApp is not connected! Please open the homepage and scan the QR code.'
+    });
+  }
 
   const category = CATEGORIES[categoryIndex % CATEGORIES.length];
   categoryIndex++;
 
   try {
-    // ফ্রি AI দিয়ে নতুন মোটিভেশন তৈরি
     const rawAiText = await generateAIMotivation(category);
     const formattedMessage = formatWhatsAppText(category, rawAiText);
 
-    // মেটা ক্লাউড এপিআই দিয়ে হোয়াটসঅ্যাপে পাঠানো
-    const metaResponse = await sendToMetaWhatsApp(formattedMessage);
-    console.log(`✅ Message sent to WhatsApp successfully via Meta Cloud API!`, metaResponse);
+    const sendResult = await sendViaBaileys(formattedMessage);
+    console.log(`✅ Message sent to WhatsApp (+${RECIPIENT_PHONE}) via Baileys!`);
 
     res.json({
       success: true,
       category: category.label,
       recipient: RECIPIENT_PHONE,
       sentAt: new Date().toISOString(),
-      metaResponse,
       preview: rawAiText
     });
   } catch (err) {
-    console.error('❌ Failed to send WhatsApp motivation:', err.message);
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+    console.error('❌ Failed to send motivation:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ৩. হোম স্ট্যাটাস পেজ
+// 4. Webpage displaying the QR code or Connected status
 app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="bn">
-    <head>
-      <meta charset="UTF-8">
-      <title>WhatsApp Motivation Bot (Meta Cloud API)</title>
-      <style>
-        body { font-family: sans-serif; background: #0b0f19; color: #f1f5f9; padding: 2rem; text-align: center; }
-        .card { background: #1e293b; max-width: 550px; margin: 2rem auto; padding: 2rem; border-radius: 16px; border: 1px solid #334155; }
-        .btn { display: inline-block; background: #25d366; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 1rem; }
-        .badge { background: rgba(37, 211, 102, 0.2); color: #25d366; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.85rem; }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <h2>📱 WhatsApp Study Motivation Bot</h2>
-        <p><span class="badge">Official Meta Cloud API Active</span></p>
-        <p><strong>প্রাপক নম্বর:</strong> ${RECIPIENT_PHONE}</p>
-        <p>GitHub Actions প্রতি ৫ মিনিটে Render কে পিং দিয়ে জাগিয়ে রাখবে এবং প্রতি ১ ঘণ্টায় ফ্রি AI দিয়ে তৈরি ইসলামিক ও স্টাডি মোটিভেশন হোয়াটসঅ্যাপে পাঠাবে।</p>
-        <a href="/send" class="btn" target="_blank">🚀 এখনই টেস্ট মেসেজ পাঠান (/send)</a>
-      </div>
-    </body>
-    </html>
-  `);
+  if (isConnected) {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="bn">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WhatsApp Bot - Connected ✅</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #070b14; color: #f8fafc; padding: 2rem 1rem; text-align: center; }
+          .card { background: #131d31; max-width: 500px; margin: 2rem auto; padding: 2.5rem; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+          .badge-ok { background: rgba(16,185,129,0.2); color: #34d399; border: 1px solid #10b981; padding: 0.5rem 1.2rem; border-radius: 999px; font-weight: bold; display: inline-block; margin-bottom: 1.5rem; }
+          .btn { display: inline-block; background: #10b981; color: white; padding: 0.9rem 1.8rem; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 1.5rem; }
+          .phone-pill { background: #1e293b; padding: 0.4rem 0.8rem; border-radius: 8px; font-family: monospace; color: #38bdf8; font-size: 1.1rem; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="badge-ok">✅ WhatsApp সংযুক্ত আছে</div>
+          <h2>স্টাডি মোটিভেশন বট সক্রিয়!</h2>
+          <p style="color: #94a3b8; margin: 1rem 0;">প্রাপক নম্বর: <span class="phone-pill">+${RECIPIENT_PHONE}</span></p>
+          <p style="color: #cbd5e1; font-size: 0.95rem;">GitHub Actions প্রতি ৫ মিনিটে সার্ভারকে ওয়েকআপ পিং পাঠাচ্ছে এবং প্রতি ১ ঘণ্টা পরপর ফ্রি AI দিয়ে তৈরি ইসলামিক ও স্টাডি মোটিভেশন আপনার হোয়াটসঅ্যাপে পাঠিয়ে দিচ্ছে।</p>
+          <a href="/send" class="btn" target="_blank">🚀 এখনই টেস্ট মেসেজ পাঠান (/send)</a>
+        </div>
+      </body>
+      </html>
+    `);
+  } else if (currentQrDataUrl) {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="bn">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>WhatsApp Bot - QR Code Login 📱</title>
+        <script>
+          // অটো রিফ্রেশ: প্রতি ৫ সেকেন্ড পর পর চেক করবে স্ক্যান হয়েছে কিনা
+          setInterval(async () => {
+            try {
+              const res = await fetch('/status');
+              const data = await res.json();
+              if (data.connected) location.reload();
+            } catch (e) {}
+          }, 4000);
+        </script>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #070b14; color: #f8fafc; padding: 2rem 1rem; text-align: center; }
+          .card { background: #131d31; max-width: 480px; margin: 1rem auto; padding: 2rem; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+          .qr-box { background: white; padding: 1rem; border-radius: 16px; display: inline-block; margin: 1.5rem 0; }
+          .qr-img { width: 250px; height: 250px; display: block; }
+          .step { text-align: left; background: rgba(255,255,255,0.05); padding: 0.8rem 1rem; border-radius: 10px; margin: 0.5rem 0; font-size: 0.9rem; color: #cbd5e1; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>📱 WhatsApp QR Code লগইন</h2>
+          <p style="color: #94a3b8; font-size: 0.9rem;">কোনো API বা ফেসবুক অ্যাকাউন্ট ছাড়াই সরাসরি WhatsApp Web দিয়ে কানেক্ট করুন</p>
+          
+          <div class="qr-box">
+            <img src="${currentQrDataUrl}" class="qr-img" alt="WhatsApp QR Code">
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <div class="step">১. আপনার মোবাইলে <strong>WhatsApp</strong> খুলুন।</div>
+            <div class="step">২. উপরে ৩টি ডট বা সেটিংসে যান ➔ <strong>Linked devices</strong> চাপুন।</div>
+            <div class="step">৩. <strong>Link a device</strong> এ ক্লিক করে এই QR কোডটি স্ক্যান করুন।</div>
+          </div>
+          
+          <p style="color: #64748b; font-size: 0.8rem; margin-top: 1rem;">স্ক্যান হওয়ার সাথে সাথেই পেজটি স্বয়ংক্রিয়ভাবে রিলোড হয়ে যাবে।</p>
+        </div>
+      </body>
+      </html>
+    `);
+  } else {
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="bn">
+      <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="refresh" content="3">
+        <title>Loading WhatsApp QR...</title>
+        <style>
+          body { font-family: sans-serif; background: #070b14; color: white; display: flex; justify-content: center; align-items: center; height: 90vh; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div>
+          <h2>⏳ WhatsApp সকেট প্রস্তুত হচ্ছে...</h2>
+          <p>QR কোড তৈরি হচ্ছে, ৩ সেকেন্ড অপেক্ষা করুন (পেজ স্বয়ংক্রিয়ভাবে রিফ্রেশ হবে)...</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
 });
 
+// সার্ভার চালু করা এবং হোয়াটসঅ্যাপ সকেট স্টার্ট করা
 app.listen(PORT, () => {
   console.log(`=========================================`);
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Official Meta WhatsApp Cloud API Mode`);
-  console.log(`👤 Recipient: ${RECIPIENT_PHONE}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
+  console.log(`📱 WhatsApp Web QR Code Mode Active (No API!)`);
+  console.log(`👤 Target Phone: +${RECIPIENT_PHONE}`);
+  console.log(`🌐 Open http://localhost:${PORT} to scan QR code`);
   console.log(`=========================================`);
+
+  // WhatsApp ক্লায়েন্ট স্টার্ট করো
+  connectToWhatsApp().catch(err => {
+    console.error('Failed to start WhatsApp socket:', err);
+  });
 });

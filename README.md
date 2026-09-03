@@ -1,6 +1,6 @@
-# 📱 WhatsApp Study & Islamic Motivation Bot (Meta Cloud API + Render + GitHub Actions)
+# 📱 WhatsApp Study & Islamic Motivation Bot (Direct WhatsApp Web QR Login)
 
-একটি অত্যন্ত দ্রুত, নির্ভরযোগ্য ও অফিসিয়াল হোয়াটসঅ্যাপ বট যা **GitHub Actions** এর ক্রন দিয়ে প্রতি ৫ মিনিটে Render কে পিং দিয়ে জাগিয়ে রাখে এবং প্রতি ১ ঘণ্টা পরপর সম্পূর্ণ **ফ্রি AI** দিয়ে আকর্ষণীয় নতুন বাংলা স্টাডি ও ইসলামিক মোটিভেশন তৈরি করে **Meta WhatsApp Cloud API** এর মাধ্যমে সরাসরি আপনার **WhatsApp (01735698076)** এ পাঠিয়ে দেয়।
+কোনো **API**, **ফেসবুক ডেভেলপার অ্যাকাউন্ট**, **টোকেন** বা **CallMeBot** ছাড়াই — কম্পিউটারে যেভাবে WhatsApp Web লগইন করেন, ঠিক সেভাবেই **QR Code স্ক্যান করে সরাসরি WhatsApp কানেক্ট করুন**!
 
 ---
 
@@ -14,48 +14,49 @@
 
 ---
 
-## ⚡ যেভাবে স্বয়ংক্রিয়ভাবে কাজ করে:
+## ⚡ যেভাবে কাজ করে:
 
 ```
-[GitHub Actions (Keepalive)] ➔ প্রতি ৫ মিনিটে Render /ping করে জাগিয়ে রাখে
-[GitHub Actions (Hourly)]    ➔ প্রতি ১ ঘণ্টায় Render /send ট্রিগার করে
+[GitHub Actions (Keepalive)] ➔ প্রতি ৫ মিনিটে Render /ping করে জাগিয়ে রাখবে
+[GitHub Actions (Hourly)]    ➔ প্রতি ১ ঘণ্টায় Render /send ট্রিগার করবে
                 │
                 ▼
-         [Render.com Web Service]
+         [Render.com Web Server]
                 │
                 ▼ (ফ্রি AI থেকে সম্পূর্ণ নতুন বাংলা মোটিভেশন জেনারেট করে)
          [Free AI (Pollinations / Gemini)]
                 │
-                ▼ (অফিসিয়াল Meta WhatsApp Cloud API)
+                ▼ (সরাসরি সকেট দিয়ে WhatsApp Web ডেলিভারি)
          [আপনার WhatsApp: 01735698076 📲]
 ```
 
 ---
 
-## 🔑 মেটা ক্লাউড এপিআই (Meta WhatsApp Cloud API) সেটআপ (২ মিনিট):
+## 📱 কীভাবে লগইন করবেন (কোনো API নেই!):
 
-1. [developers.facebook.com](https://developers.facebook.com) এ গিয়ে লগইন করে একটি নতুন অ্যাপ তৈরি করুন (App Type: **Other** বা **Business**)।
-2. অ্যাপে **WhatsApp** প্রোডাক্টটি যুক্ত করুন।
-3. **API Setup** পেজে যান:
-   - **Temporary access token**: এখান থেকে টোকেনটি কপি করুন (বা পার্মানেন্ট সিস্টেম ইউজার টোকেন নিন)।
-   - **Phone number ID**: এটি কপি করুন।
-   - **To (Recipient)**: আপনার নম্বর `8801735698076` ভেরিফাই করে নিন (একটি ওটিপি আসবে)।
+1. আপনার Render অ্যাপের লিঙ্কে যান (যেমন: `https://motivation-042y.onrender.com`) বা লোকালহোস্টে `http://localhost:3000`।
+2. স্ক্রিনে একটি **WhatsApp QR Code** ভেসে উঠবে।
+3. আপনার মোবাইলে **WhatsApp** খুলুন ➔ **Linked devices** ➔ **Link a device** চাপুন।
+4. স্ক্রিনের QR কোডটি স্ক্যান করে নিন!
+5. স্ক্যান হওয়ার সাথে সাথেই স্ক্রিনে ভেসে উঠবে: **"✅ WhatsApp সংযুক্ত আছে (+8801735698076)"**।
 
 ---
 
 ## 🚀 Render.com এ ডিপ্লয়মেন্ট:
 
 1. [Render.com](https://render.com) এ আপনার `kdhbudakhilmadrasa-cloud/motivation` রিপোজিটরি যুক্ত করুন।
-2. **Environment Variables** এ এই মানগুলো দিন:
-   - `WHATSAPP_TOKEN` : মেটা থেকে পাওয়া অ্যাক্সেস টোকেন
-   - `PHONE_NUMBER_ID` : মেটার ফোন নম্বর আইডি
+2. সেটিংস দিন:
+   - **Build Command**: `npm install`
+   - **Start Command**: `node server.js`
+   - **Plan**: `Free`
+3. **Environment Variables**:
    - `RECIPIENT_PHONE` : `01735698076`
    - *(ঐচ্ছিক)* `GEMINI_API_KEY` : গুগল জেমিনাই এর ফ্রি কি থাকলে দিতে পারেন, না দিলেও স্বয়ংক্রিয়ভাবে ফ্রি Pollinations AI কাজ করবে!
-3. **Save Changes** চাপুন।
+4. **Create Web Service** চাপুন।
 
 ---
 
 ## 📂 ফাইলসমূহ:
 - `.github/workflows/keepalive.yml` : প্রতি ৫ মিনিটে Render কে পিং দিয়ে ঘুমোতে দেয় না।
 - `.github/workflows/hourly.yml` : প্রতি ১ ঘণ্টায় নতুন মোটিভেশন তৈরি করে পাঠায়।
-- `server.js` : ফ্রি AI কল করা এবং Meta Cloud API দিয়ে সরাসরি WhatsApp এ পাঠানোর মূল নোড সার্ভার।
+- `server.js` : Baileys দিয়ে সরাসরি WhatsApp Web QR কোড লগইন ও ফ্রি AI মোটিভেশন ডিসপ্যাচ।

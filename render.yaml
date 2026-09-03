@@ -6,10 +6,6 @@ services:
     buildCommand: npm install
     startCommand: node server.js
     envVars:
-      - key: WHATSAPP_TOKEN
-        sync: false
-      - key: PHONE_NUMBER_ID
-        sync: false
       - key: RECIPIENT_PHONE
         value: "01735698076"
       - key: GEMINI_API_KEY
