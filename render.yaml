@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sheet-whatsapp-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: WHATSAPP_PHONE
+        sync: false
+      - key: CALLMEBOT_APIKEY
+        sync: false
