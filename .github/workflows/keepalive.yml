@@ -1,0 +1,17 @@
+name: 5-Minute Render Keepalive Ping
+
+on:
+  schedule:
+    # Runs every 5 minutes to prevent Render 15-minute sleep
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping-keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render /ping
+        run: |
+          RENDER_URL="${{ secrets.RENDER_URL || 'https://motivation-042y.onrender.com' }}"
+          echo "Sending 5-min keepalive ping to: $RENDER_URL/ping"
+          curl -s -m 15 "$RENDER_URL/ping" || echo "Ping request sent."

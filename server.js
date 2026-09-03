@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PHONE = process.env.WHATSAPP_PHONE;
+const PHONE = process.env.WHATSAPP_PHONE || '01735698076';
 const APIKEY = process.env.CALLMEBOT_APIKEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -104,12 +104,15 @@ function formatWhatsAppText(category, aiContent) {
  * CallMeBot API এর মাধ্যমে WhatsApp এ পাঠানো
  */
 async function sendToWhatsApp(messageText) {
-  if (!PHONE || !APIKEY) {
-    throw new Error('WHATSAPP_PHONE or CALLMEBOT_APIKEY is missing in Render environment variables.');
+  if (!APIKEY) {
+    throw new Error('CALLMEBOT_APIKEY is missing in Render environment variables.');
   }
 
-  // Sanitize phone (e.g. +88017... -> 88017...)
-  let cleanPhone = PHONE.trim().replace(/[\s\-\(\)\+]/g, '');
+  // Format phone number: 01735698076 -> 8801735698076 (CallMeBot requires international country code without +)
+  let cleanPhone = (PHONE || '01735698076').trim().replace(/[\s\-\(\)\+]/g, '');
+  if (cleanPhone.startsWith('01') && cleanPhone.length === 11) {
+    cleanPhone = '88' + cleanPhone;
+  }
   const encodedText = encodeURIComponent(messageText);
   const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedText}&apikey=${APIKEY.trim()}`;
 
