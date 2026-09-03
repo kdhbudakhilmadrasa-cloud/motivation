@@ -5,11 +5,19 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const PHONE = process.env.WHATSAPP_PHONE || '01735698076';
-const APIKEY = process.env.CALLMEBOT_APIKEY;
+
+// Meta WhatsApp Cloud API Settings
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+let RECIPIENT_PHONE = (process.env.RECIPIENT_PHONE || '01735698076').trim().replace(/[\s\-\(\)\+]/g, '');
+if (RECIPIENT_PHONE.startsWith('01') && RECIPIENT_PHONE.length === 11) {
+  RECIPIENT_PHONE = '88' + RECIPIENT_PHONE; // 01735698076 -> 8801735698076
+}
+
+// Optional Google Gemini API Key (if blank, uses free Pollinations AI)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
-// ৬টি ক্যাটাগরি (MBBS সম্পূর্ণ বাদ দেওয়া হয়েছে)
+// ৬টি ক্যাটাগরি (MBBS সম্পূর্ণ বাদ)
 const CATEGORIES = [
   { id: 'ISLAMIC', label: 'ইসলামিক ও ইলম 🌙', desc: 'ইলম অন্বেষণ, নিয়তের বিশুদ্ধতা, সবর ও হাদিস-কুরআনের বাণী' },
   { id: 'STUDY', label: 'পড়াশোনা ও অধ্যবসায় 📚', desc: 'অধ্যবসায়, অলসতা দূরীকরণ ও লক্ষ্য অর্জন' },
@@ -22,7 +30,7 @@ const CATEGORIES = [
 let categoryIndex = 0;
 
 /**
- * ১. ফ্রি AI (Gemini বা Pollinations) দিয়ে বাংলা স্টাডি মোটিভেশন জেনারেট করা
+ * ১. সম্পূর্ণ ফ্রি AI দিয়ে বাংলা স্টাডি মোটিভেশন জেনারেট করা
  */
 async function generateAIMotivation(category) {
   const prompt = 
@@ -38,7 +46,7 @@ Requirements:
 3. Format nicely with emojis. DO NOT include MBBS or medical topics.
 Reply ONLY with the formatted Bengali message, no introductory English text.`;
 
-  // ক. যদি Gemini API Key থাকে, তবে Gemini 1.5 Flash ব্যবহার করো
+  // ক. Gemini API Key থাকলে Gemini ব্যবহার করো
   if (GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '') {
     try {
       console.log('🤖 Asking Google Gemini AI...');
@@ -53,33 +61,29 @@ Reply ONLY with the formatted Bengali message, no introductory English text.`;
       });
       const data = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim().length > 20) {
-        return text.trim();
-      }
+      if (text && text.trim().length > 20) return text.trim();
     } catch (err) {
       console.warn('⚠️ Gemini AI failed, falling back to Pollinations:', err.message);
     }
   }
 
-  // খ. বিকল্প ১০০% ফ্রি AI (Pollinations AI - কোনো সাইনআপ বা কি ছাড়াই কাজ করে)
+  // খ. বিকল্প ১০০% ফ্রি AI (Pollinations AI - কোনো কি ছাড়া সরাসরি কাজ করে)
   try {
     console.log('🤖 Asking Free Pollinations AI...');
     const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`;
     const res = await fetch(url, { headers: { 'User-Agent': 'MotivationBot/1.0' } });
     const text = await res.text();
-    if (text && text.trim().length > 20) {
-      return text.trim();
-    }
+    if (text && text.trim().length > 20) return text.trim();
   } catch (err) {
     console.warn('⚠️ Pollinations AI failed:', err.message);
   }
 
-  // গ. ব্যাকআপ মোটিভেশন (যদি ইন্টারনেট বা AI সার্ভারে সমস্যা হয়)
-  return `📌 অধ্যবসায় ও নিয়তের বরকত\n\nপড়াশোনার প্রতিটি মুহূর্তকে আল্লাহর সন্তুষ্টির নিয়তে ব্যয় করো। অলসতাকে প্রশ্রয় দিও না; আজকের পরিশ্রমই আগামী দিনের বিজয়ের ভিত্তি।\n\n💡 আজকের টিপ: আগামী ১ ঘণ্টার জন্য ফোন 'ডু নট ডিস্টার্ব' মুডে রেখে পড়তে বসো।\n💬 'সময়ের মূল্যায়ন করো, কারণ অতীত সময় কখনো ফিরে আসে না।'`;
+  // গ. ব্যাকআপ মোটিভেশন
+  return `📌 অধ্যবসায় ও নিয়তের বরকত\n\nপড়াশোনার প্রতিটি মুহূর্তকে আল্লাহর সন্তুষ্টির নিয়তে ব্যয় করো। অলসতাকে প্রশ্রয় দিও না; আজকের পরিশ্রমই আগামী দিনের সাফল্যের মূল ভিত্তি।\n\n💡 আজকের টিপ: আগামী ১ ঘণ্টার জন্য মোবাইল দূরে রেখে পড়তে বসো।\n💬 'সময়ের মূল্যায়ন করো, কারণ অতীত সময় কখনো ফিরে আসে না।'`;
 }
 
 /**
- * হোয়াটসঅ্যাপের জন্য সুন্দর করে মেসেজ ফরম্যাট করা
+ * হোয়াটসঅ্যাপের জন্য সুন্দর করে মেসেজ সাজানো
  */
 function formatWhatsAppText(category, aiContent) {
   const timeStr = new Date().toLocaleTimeString('bn-BD', {
@@ -101,57 +105,70 @@ function formatWhatsAppText(category, aiContent) {
 }
 
 /**
- * CallMeBot API এর মাধ্যমে WhatsApp এ পাঠানো
+ * ২. অফিসিয়াল Meta WhatsApp Cloud API দিয়ে সরাসরি হোয়াটসঅ্যাপে পাঠানো
  */
-async function sendToWhatsApp(messageText) {
-  if (!APIKEY) {
-    throw new Error('CALLMEBOT_APIKEY is missing in Render environment variables.');
+async function sendToMetaWhatsApp(messageText) {
+  if (!WHATSAPP_TOKEN || !PHONE_NUMBER_ID) {
+    throw new Error('WHATSAPP_TOKEN or PHONE_NUMBER_ID is missing in Render environment variables.');
   }
 
-  // Format phone number: 01735698076 -> 8801735698076 (CallMeBot requires international country code without +)
-  let cleanPhone = (PHONE || '01735698076').trim().replace(/[\s\-\(\)\+]/g, '');
-  if (cleanPhone.startsWith('01') && cleanPhone.length === 11) {
-    cleanPhone = '88' + cleanPhone;
-  }
-  const encodedText = encodeURIComponent(messageText);
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedText}&apikey=${APIKEY.trim()}`;
+  const url = `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`;
 
-  const res = await fetch(url);
-  const text = await res.text();
-  return text;
+  const payload = {
+    messaging_product: 'whatsapp',
+    to: RECIPIENT_PHONE,
+    type: 'text',
+    text: { body: messageText }
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.error?.message || JSON.stringify(result));
+  }
+
+  return result;
 }
 
-// 1. Health & Ping endpoints (GitHub Actions pings /ping to wake Render up if asleep)
+// ১. ওয়েকআপ এন্ডপয়েন্ট (GitHub Actions প্রতি ৫ মিনিটে কল করে Render কে জাগিয়ে রাখবে)
 app.get('/ping', (req, res) => {
   res.send('Render is awake and ready! 🚀');
 });
 
-// 2. Trigger endpoint (GitHub Actions calls this every 1 hour)
+// ২. মূল ট্রিগার এন্ডপয়েন্ট (GitHub Actions প্রতি ১ ঘণ্টায় কল করবে)
 app.all('/send', async (req, res) => {
-  console.log(`\n⏰ [${new Date().toISOString()}] Trigger received from GitHub Actions / cron!`);
+  console.log(`\n⏰ [${new Date().toISOString()}] Hourly motivation trigger received!`);
 
-  // বর্তমান ক্যাটাগরি নির্বাচন ও পরবর্তী ক্যাটাগরির জন্য ইনক্রিমেন্ট
   const category = CATEGORIES[categoryIndex % CATEGORIES.length];
   categoryIndex++;
 
   try {
-    // ফ্রি AI দিয়ে আনলিমিটেড নতুন মোটিভেশন তৈরি
+    // ফ্রি AI দিয়ে নতুন মোটিভেশন তৈরি
     const rawAiText = await generateAIMotivation(category);
     const formattedMessage = formatWhatsAppText(category, rawAiText);
 
-    // WhatsApp এ পাঠানো
-    const providerResult = await sendToWhatsApp(formattedMessage);
-    console.log(`✅ Sent to WhatsApp successfully. Provider response: ${providerResult}`);
+    // মেটা ক্লাউড এপিআই দিয়ে হোয়াটসঅ্যাপে পাঠানো
+    const metaResponse = await sendToMetaWhatsApp(formattedMessage);
+    console.log(`✅ Message sent to WhatsApp successfully via Meta Cloud API!`, metaResponse);
 
     res.json({
       success: true,
       category: category.label,
+      recipient: RECIPIENT_PHONE,
       sentAt: new Date().toISOString(),
-      providerResponse: providerResult,
+      metaResponse,
       preview: rawAiText
     });
   } catch (err) {
-    console.error('❌ Failed to process motivation:', err.message);
+    console.error('❌ Failed to send WhatsApp motivation:', err.message);
     res.status(500).json({
       success: false,
       error: err.message
@@ -159,27 +176,27 @@ app.all('/send', async (req, res) => {
   }
 });
 
-// 3. Root status dashboard
+// ৩. হোম স্ট্যাটাস পেজ
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="bn">
     <head>
       <meta charset="UTF-8">
-      <title>WhatsApp Study Motivation Bot</title>
+      <title>WhatsApp Motivation Bot (Meta Cloud API)</title>
       <style>
         body { font-family: sans-serif; background: #0b0f19; color: #f1f5f9; padding: 2rem; text-align: center; }
         .card { background: #1e293b; max-width: 550px; margin: 2rem auto; padding: 2rem; border-radius: 16px; border: 1px solid #334155; }
-        .btn { display: inline-block; background: #10b981; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 1rem; }
-        .badge { background: rgba(16,185,129,0.2); color: #34d399; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.85rem; }
+        .btn { display: inline-block; background: #25d366; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 1rem; }
+        .badge { background: rgba(37, 211, 102, 0.2); color: #25d366; padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.85rem; }
       </style>
     </head>
     <body>
       <div class="card">
-        <h2>🩺 WhatsApp Study Motivation Bot</h2>
-        <p><span class="badge">Render Webhook Active</span></p>
-        <p>GitHub Actions প্রতি ১ ঘণ্টা পরপর Render কে ওয়েকআপ পিং দিয়ে স্বয়ংক্রিয়ভাবে ফ্রি AI থেকে নতুন বাংলা মোটিভেশন তৈরি করে হোয়াটসঅ্যাপে পাঠাবে।</p>
-        <p><strong>বিভাগসমূহ:</strong> ইসলামিক 🌙, পড়াশোনা 📚, স্টাডি টিপস 💡, ফোকাস 🎯, স্বাস্থ্য 🧘, মনীষী 🏛️ (MBBS বাদ দেওয়া হয়েছে)</p>
+        <h2>📱 WhatsApp Study Motivation Bot</h2>
+        <p><span class="badge">Official Meta Cloud API Active</span></p>
+        <p><strong>প্রাপক নম্বর:</strong> ${RECIPIENT_PHONE}</p>
+        <p>GitHub Actions প্রতি ৫ মিনিটে Render কে পিং দিয়ে জাগিয়ে রাখবে এবং প্রতি ১ ঘণ্টায় ফ্রি AI দিয়ে তৈরি ইসলামিক ও স্টাডি মোটিভেশন হোয়াটসঅ্যাপে পাঠাবে।</p>
         <a href="/send" class="btn" target="_blank">🚀 এখনই টেস্ট মেসেজ পাঠান (/send)</a>
       </div>
     </body>
@@ -189,8 +206,8 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`=========================================`);
-  console.log(`🚀 Server listening on port ${PORT}`);
-  console.log(`🩺 Ping endpoint: http://localhost:${PORT}/ping`);
-  console.log(`📤 Trigger endpoint: http://localhost:${PORT}/send`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Official Meta WhatsApp Cloud API Mode`);
+  console.log(`👤 Recipient: ${RECIPIENT_PHONE}`);
   console.log(`=========================================`);
 });
