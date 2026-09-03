@@ -10,3 +10,5 @@ services:
         value: "01735698076"
       - key: GEMINI_API_KEY
         sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-1.5-pro"

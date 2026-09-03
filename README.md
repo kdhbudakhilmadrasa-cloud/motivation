@@ -1,6 +1,6 @@
-# 📱 WhatsApp Study & Islamic Motivation Bot (Direct WhatsApp Web QR Login)
+# 📱 WhatsApp Study & Islamic Motivation Bot (Gemini Pro + WhatsApp Web QR)
 
-কোনো **API**, **ফেসবুক ডেভেলপার অ্যাকাউন্ট**, **টোকেন** বা **CallMeBot** ছাড়াই — কম্পিউটারে যেভাবে WhatsApp Web লগইন করেন, ঠিক সেভাবেই **QR Code স্ক্যান করে সরাসরি WhatsApp কানেক্ট করুন**!
+Google এর সর্বাধুনিক **Gemini Pro (gemini-1.5-pro)** কৃত্রিম বুদ্ধিমত্তা দিয়ে প্রতি ১ ঘণ্টায় স্বয়ংক্রিয়ভাবে আকর্ষণীয় নতুন বাংলা স্টাডি ও ইসলামিক মোটিভেশন তৈরি করে সরাসরি আপনার **WhatsApp (+8801735698076)** এ পাঠিয়ে দেওয়া হয় — কোনো জটিল API ছাড়াই সরাসরি **WhatsApp Web QR Code** স্ক্যান করে লগইন করুন!
 
 ---
 
@@ -14,49 +14,18 @@
 
 ---
 
-## ⚡ যেভাবে কাজ করে:
-
-```
-[GitHub Actions (Keepalive)] ➔ প্রতি ৫ মিনিটে Render /ping করে জাগিয়ে রাখবে
-[GitHub Actions (Hourly)]    ➔ প্রতি ১ ঘণ্টায় Render /send ট্রিগার করবে
-                │
-                ▼
-         [Render.com Web Server]
-                │
-                ▼ (ফ্রি AI থেকে সম্পূর্ণ নতুন বাংলা মোটিভেশন জেনারেট করে)
-         [Free AI (Pollinations / Gemini)]
-                │
-                ▼ (সরাসরি সকেট দিয়ে WhatsApp Web ডেলিভারি)
-         [আপনার WhatsApp: 01735698076 📲]
-```
-
----
-
-## 📱 কীভাবে লগইন করবেন (কোনো API নেই!):
-
-1. আপনার Render অ্যাপের লিঙ্কে যান (যেমন: `https://motivation-042y.onrender.com`) বা লোকালহোস্টে `http://localhost:3000`।
-2. স্ক্রিনে একটি **WhatsApp QR Code** ভেসে উঠবে।
-3. আপনার মোবাইলে **WhatsApp** খুলুন ➔ **Linked devices** ➔ **Link a device** চাপুন।
-4. স্ক্রিনের QR কোডটি স্ক্যান করে নিন!
-5. স্ক্যান হওয়ার সাথে সাথেই স্ক্রিনে ভেসে উঠবে: **"✅ WhatsApp সংযুক্ত আছে (+8801735698076)"**।
+## 🤖 গুগল জেমিনাই প্রো (Google Gemini Pro AI):
+- মডেল: `gemini-1.5-pro` (স্বয়ংক্রিয় `gemini-1.5-flash` ফলব্যাক ব্যাকআপ সহ)।
+- উচ্চমানের শুদ্ধ ও গভীর অনুপ্রেরণাদায়ী বাংলা তৈরি করে।
+- কখনো কোনো কোটা বা সার্ভার এরর মেসেজ পাঠাবে না; জরুরি অবস্থায় অভ্যন্তরীণ সমৃদ্ধ বাংলা ব্যাংক ব্যবহার করবে।
 
 ---
 
 ## 🚀 Render.com এ ডিপ্লয়মেন্ট:
 
 1. [Render.com](https://render.com) এ আপনার `kdhbudakhilmadrasa-cloud/motivation` রিপোজিটরি যুক্ত করুন।
-2. সেটিংস দিন:
-   - **Build Command**: `npm install`
-   - **Start Command**: `node server.js`
-   - **Plan**: `Free`
-3. **Environment Variables**:
+2. **Environment Variables** এ এই মানগুলো দিন:
+   - `GEMINI_API_KEY` : আপনার Google Gemini Pro একাউন্টের API Key ([aistudio.google.com](https://aistudio.google.com) থেকে সংগৃহীত)।
+   - `GEMINI_MODEL` : `gemini-1.5-pro` (বা `gemini-1.5-flash`)
    - `RECIPIENT_PHONE` : `01735698076`
-   - *(ঐচ্ছিক)* `GEMINI_API_KEY` : গুগল জেমিনাই এর ফ্রি কি থাকলে দিতে পারেন, না দিলেও স্বয়ংক্রিয়ভাবে ফ্রি Pollinations AI কাজ করবে!
-4. **Create Web Service** চাপুন।
-
----
-
-## 📂 ফাইলসমূহ:
-- `.github/workflows/keepalive.yml` : প্রতি ৫ মিনিটে Render কে পিং দিয়ে ঘুমোতে দেয় না।
-- `.github/workflows/hourly.yml` : প্রতি ১ ঘণ্টায় নতুন মোটিভেশন তৈরি করে পাঠায়।
-- `server.js` : Baileys দিয়ে সরাসরি WhatsApp Web QR কোড লগইন ও ফ্রি AI মোটিভেশন ডিসপ্যাচ।
+3. ডিপ্লয় শেষ হলে Render এর ওয়েব লিঙ্কে গিয়ে একবার WhatsApp Web এর **QR কোডটি স্ক্যান করে নিন**!

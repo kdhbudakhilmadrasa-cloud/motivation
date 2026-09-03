@@ -88,7 +88,19 @@ async function connectToWhatsApp() {
 }
 
 /**
- * সম্পূর্ণ ফ্রি AI দিয়ে বাংলা স্টাডি মোটিভেশন জেনারেট করা
+ * সমৃদ্ধ বাংলা ব্যাকআপ ব্যাংক (যদি কখনো ইন্টারনেট বা কোটায় সমস্যা হয়)
+ */
+const FALLBACK_BANK = {
+  ISLAMIC: `📌 নিয়তের বরকত ও ইলমের মর্যাদা\n\nপড়াশোনা করার সময় নিয়তকে পবিত্র রাখো—হালাল রিজিক ও মুসলিম উম্মাহর খেদমত। তোমার টেবিলে বসা প্রতিটি মুহূর্ত ইবাদত হিসেবে গণ্য হবে ইনশাআল্লাহ।\n\n💡 আজকের টিপ: পড়ার শুরুতে 'রাব্বি জিদনি ইলমা' পাঠ করে বরকত কামনা করো।\n💬 'যে ব্যক্তি জ্ঞান অর্জনের পথে চলে, আল্লাহ তার জান্নাতের পথ সহজ করে দেন।' (সহীহ মুসলিম)`,
+  STUDY: `📌 অজুহাত নয়, লক্ষ্যই আসল\n\nআজ হয়তো পড়তে ভালো লাগছে না। কিন্তু মনে রেখো, চ্যাম্পিয়নরা মুডের অপেক্ষায় বসে থাকে না; তারা কাজ শুরু করে বলেই মুড ফিরে আসে। তোমার আজকের পরিশ্রমই আগামী দিনের বিজয়ের ভিত্তি।\n\n💡 ৫ মিনিটের নিয়ম: কেবল ৫ মিনিটের জন্য টেবিলে বসো, দেখবে পড়ার গতি চলে এসেছে।\n💬 'যত বেশি ঘাম ঝরাবে, ভাগ্য তত বেশি সহায় হবে।'`,
+  STUDYTIPS: `📌 অ্যাক্টিভ রিকল (Active Recall) মেথড\n\nবারবার রিডিং পড়ার চেয়ে এক প্যারাগ্রাফ পড়ে বই বন্ধ করে নিজেকে প্রশ্ন করো: 'আমি কী শিখলাম?' নিজের ভাষায় খাতায় লেখো। এতে স্মৃতিশক্তি বহুগুণ শক্তিশালী হয়।\n\n💡 ট্রাই করো: পড়া শেষে চোখ বন্ধ করে মূল ৩টি পয়েন্ট মনে করার চেষ্টা করো।\n💬 'জ্ঞান তখন স্থায়ী হয় যখন তা মেমরি থেকে রিকল করা হয়।'`,
+  FOCUS: `📌 ডোপামিন ডিটক্স ও মোবাইল বর্জন\n\nএকবার নোটিফিকেশন চেক করতে গিয়ে আধা ঘণ্টা হারিয়ে যায়। পড়ার টেবিলে ফোন রাখা মনোযোগ নষ্ট করার সবচেয়ে বড় ফাঁদ। তীব্র ফোকাসই সাধারণ শিক্ষার্থীকে অনন্য করে তোলে।\n\n💡 চ্যালেঞ্জ: আগামী ১ ঘণ্টার জন্য ফোন অন্য রুমে রেখে দরজা বন্ধ করে পড়ো।\n💬 'যেখানে গভীর মনোযোগ যায়, সেখানেই কাঙ্ক্ষিত সাফল্য আসে।'`,
+  HEALTH: `📌 ব্রেইনের আসল জ্বালানি—পানি ও ঘুম\n\nমস্তিষ্কের ৮০% পানি দিয়ে গঠিত। সামান্য পানিশূন্যতা মনোযোগ ও মেমরি অনেক কমিয়ে দেয়। এছাড়া স্মৃতি স্থায়ী করতে ৭-৮ ঘণ্টার পরিমিত ঘুম অপরিহার্য।\n\n💡 এখনই করো: এক গ্লাস বিশুদ্ধ পানি পান করো এবং গভীর শ্বাস নাও।\n💬 'সুস্থ শরীরই হলো তীক্ষ্ণ মেধার নিরাপদ আশ্রয়।'`,
+  SCHOLARS: `📌 ইমাম বুখারী (রহ.) এর সাধনা\n\nহাদিস বিশারদ ইমাম বুখারী (রহ.) এক রাতে প্রায় বিশ বার ঘুম থেকে উঠে প্রদীপ জ্বালিয়ে নোট ও হাদিস যাচাই করতেন। নির্ঘুম রাত ও একাগ্র সাধনার বিনিময়েই মানুষ ইতিহাসে স্মরণীয় হয়ে থাকে।\n\n💡 প্রেরণা: তোমার আজকের ত্যাগের প্রতিটি মুহূর্ত ভবিষ্যৎ সফলতার ভিত্তি।\n💬 'শরীরের আরামপ্রিয়তা দিয়ে জ্ঞান অর্জন সম্ভব নয়।' — ইয়াহিয়া ইবনে আবি কাসির`
+};
+
+/**
+ * গুগল জেমিনাই (Gemini Pro / Flash) দিয়ে বাংলা স্টাডি মোটিভেশন তৈরি করা
  */
 async function generateAIMotivation(category) {
   const prompt = 
@@ -101,13 +113,15 @@ Requirements:
    মূল বক্তব্য (সহজ, সাবলীল ও গভীর অনুপ্রেরণামূলক বাংলা)
    💡 আজকের ছোট অ্যাকশন টিপ (১টি বাস্তবসম্মত কাজ)
    💬 অনুপ্রেরণাদায়ী উক্তি বা হাদিস
-3. Format nicely with emojis. DO NOT include MBBS or medical topics.
+3. Format nicely with emojis. Strictly DO NOT include MBBS or medical topics.
 Reply ONLY with the formatted Bengali message, no introductory English text.`;
+
+  const model = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
 
   if (GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '') {
     try {
-      console.log('🤖 Asking Google Gemini AI...');
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`;
+      console.log(`🤖 Asking Google Gemini (${model})...`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY.trim()}`;
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,25 +130,48 @@ Reply ONLY with the formatted Bengali message, no introductory English text.`;
           generationConfig: { temperature: 0.8, maxOutputTokens: 450 }
         })
       });
+
       const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error?.message || `Gemini HTTP ${res.status}`);
+      }
+
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text && text.trim().length > 20) return text.trim();
+      if (text && text.trim().length > 20 && !text.includes('"error"')) {
+        console.log(`✅ Gemini (${model}) generated motivation successfully!`);
+        return text.trim();
+      }
     } catch (err) {
-      console.warn('⚠️ Gemini fallback to Pollinations:', err.message);
+      console.warn(`⚠️ Gemini ${model} failed (${err.message}), trying gemini-1.5-flash fallback...`);
+      // Secondary fallback to gemini-1.5-flash if pro is rate-limited
+      try {
+        const flashUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`;
+        const flashRes = await fetch(flashUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.8, maxOutputTokens: 450 }
+          })
+        });
+        const flashData = await flashRes.json();
+        const flashText = flashData?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (flashText && flashText.trim().length > 20 && !flashText.includes('"error"')) {
+          console.log(`✅ Gemini 1.5-flash generated motivation successfully!`);
+          return flashText.trim();
+        }
+      } catch (e) {
+        console.warn('⚠️ Gemini flash fallback also failed:', e.message);
+      }
     }
+  } else {
+    console.warn('⚠️ GEMINI_API_KEY is not set in environment variables.');
   }
 
-  try {
-    console.log('🤖 Asking Free Pollinations AI...');
-    const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'MotivationBot/1.0' } });
-    const text = await res.text();
-    if (text && text.trim().length > 20) return text.trim();
-  } catch (err) {
-    console.warn('⚠️ Pollinations AI failed:', err.message);
-  }
-
-  return `📌 অধ্যবসায় ও নিয়তের বরকত\n\nপড়াশোনার প্রতিটি মুহূর্তকে আল্লাহর সন্তুষ্টির নিয়তে ব্যয় করো। অলসতাকে প্রশ্রয় দিও না; আজকের পরিশ্রমই আগামী দিনের বিজয়ের চাবিকাঠি।\n\n💡 আজকের টিপ: আগামী ১ ঘণ্টা ফোন দূরে রেখে মন দিয়ে পড়ো।\n💬 'সময়ের মূল্যায়ন করো, কারণ অতীত সময় কখনো ফিরে আসে না।'`;
+  // Pollinations সম্পূর্ণ বাদ! নির্ভরযোগ্য বাংলা ব্যাংক থেকে রিটার্ন করো:
+  console.log(`📖 Using curated Bangla motivation from internal bank for: ${category.id}`);
+  return FALLBACK_BANK[category.id] || FALLBACK_BANK.ISLAMIC;
 }
 
 function formatWhatsAppText(category, aiContent) {
